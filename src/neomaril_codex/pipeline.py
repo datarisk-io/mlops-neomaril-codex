@@ -89,7 +89,7 @@ class NeomarilPipeline:
         self.monitoring_config = kwargs
 
     @staticmethod
-    def from_config_file(path):
+    def from_config_file(**kwargs):
         """
         Load the configuration files for orchestrate the model
 
@@ -114,6 +114,8 @@ class NeomarilPipeline:
         >>> pipeline.register_monitoring_config(directory = "./samples/monitoring", preprocess = "preprocess.py", preprocess_function = "score", shap_function = "score", config = "configuration.json", packages = "requirements.txt")
         >>> pipeline.start()
         """
+        path = check_args(kwargs, ["path"], {})
+
         with open(path, 'rb') as stream:
             try:
                 conf=yaml.safe_load(stream)

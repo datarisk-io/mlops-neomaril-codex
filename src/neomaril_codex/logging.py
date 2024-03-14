@@ -54,7 +54,7 @@ class Logger:
         self.__levels=["OUTPUT", "DEBUG", "WARNING", "ERROR"]
         self.__data = ''
         
-    def __log(self, level:str, message:str):
+    def __log(self, **kwargs):
         """
         Logger base method used by others.
 
@@ -65,6 +65,8 @@ class Logger:
         message : str
             Message that will be logged
         """
+
+		level, message = check_args(kwargs, ["level", "message"], {})
         
         if level in self.__levels:
             log_message = f"[{level}]{message}[{level}]"
@@ -84,7 +86,7 @@ class Logger:
             raise InputError(f'Invalid level {level}. Valid options are {" ".join(self.__levels)}')
 
 
-    def debug(self, message:str) -> None:
+    def debug(self, **kwargs) -> None:
         """
         Logs a DEBUG message.
 
@@ -93,9 +95,11 @@ class Logger:
         message : str
             Message that will be logged
         """
+		message = check_args(kwargs, ["message"], {})
+
         self.__log('DEBUG', message)
 
-    def warning(self, message:str) -> None:
+    def warning(self, **kwargs) -> None:
         """
         Logs a WARNING message.
 
@@ -104,9 +108,11 @@ class Logger:
         message : str
             Message that will be logged
         """
+        message = check_args(kwargs, ["message"], {})
+
         self.__log('WARNING', message)
 
-    def error(self, message:str) -> None:
+    def error(self, **kwargs) -> None:
         """
         Logs a ERROR message.
                 
@@ -115,10 +121,12 @@ class Logger:
         message : str
             Message that will be logged
         """
+        message = check_args(kwargs, ["message"], {})
+
         self.__log('ERROR', message)
 
 
-    def callback(self, output:Union[str,int,float,list,dict]) -> str:
+    def callback(self, **kwargs) -> str:
         """
         Compile the logs with the response for Sync models only. Should be the return of function being executed.
         This output should be able to be parsed as a JSON, so if you are using a non-primitive type as your return, make sure it can be parsed by `json.dumps`.
@@ -143,6 +151,7 @@ class Logger:
         output : str
             Output of the function being executed.
         """
+        output = check_args(kwargs, ["output"], {})
 
         if self.model_type == "Sync":
             if isinstance(output, (dict, list)):

@@ -98,7 +98,7 @@ class NeomarilPreprocessing(BaseNeomaril):
                 sleep(30)
                 self.status = self.__get_status()['Status']
 
-    def get_logs(self, start:Optional[str]=None, end:Optional[str]=None, routine:Optional[str]=None, type:Optional[str]=None):
+    def get_logs(self, **kwargs):
         """
         Get the logs 
 
@@ -134,10 +134,12 @@ class NeomarilPreprocessing(BaseNeomaril):
                 'Routine': 'Run'}]
          }
         """
+        start, end, routine, type = check_args(kwargs, [], {"start": None, "end": None, "routine": None, "type": None})
+
         url = f"{self.base_url}/preprocessing/logs/{self.group}/{self.preprocessing_id}"
         return self._logs(url, self.__credentials, start=start, end=end, routine=routine, type=type)
         
-    def set_token(self, group_token:str) -> None:
+    def set_token(self, **kwargs) -> None:
         """
         Saves the group token for this pre processing instance.
 
@@ -150,11 +152,12 @@ class NeomarilPreprocessing(BaseNeomaril):
         -------
         >>> preprocessing.set_token('6cb64889a45a45ea8749881e30c136df')
         """
+        group_token = check_args(kwargs, ["group_token"], {})
 
         self.__token = group_token
         logger.info(f"Token for group {self.group} added.")
 
-    def run(self, data:Union[dict, str], group_token:Optional[str]=None, wait_complete:Optional[bool]=False) -> Union[dict, NeomarilExecution]:
+    def run(self, **kwargs) -> Union[dict, NeomarilExecution]:
         """
         Runs a prediction from the current pre processing.
 
@@ -179,6 +182,8 @@ class NeomarilPreprocessing(BaseNeomaril):
         Union[dict, NeomarilExecution]
             The return of the scoring function in the source file for Sync pre processing or the execution class for Async pre processing.
         """
+        data, group_token, wait_complete = check_args(kwargs, ["data"], {"group_token": None, "wait_complete": False})
+
         if self.__preprocessing_ready:
             if (group_token is not None) | (self.__token is not None):
                 url = f"{self.base_url}/preprocessing/{self.operation}/run/{self.group}/{self.preprocessing_id}"
@@ -244,7 +249,7 @@ class NeomarilPreprocessing(BaseNeomaril):
     def __call__(self, data: dict) -> dict:
         return self.predict(data)
     
-    def get_preprocessing_execution(self, exec_id:str) -> None:
+    def get_preprocessing_execution(self, **kwargs) -> None:
         """
         Get a execution instance for that pre processing.
 
@@ -262,6 +267,8 @@ class NeomarilPreprocessing(BaseNeomaril):
         -------
         >>> preprocessing.get_preprocessing_execution('1')
         """
+        exec_id = check_args(kwargs, ["exec_id"], {})
+
         if self.operation == 'async':
             return NeomarilExecution(self.preprocessing_id, 'AsyncPreprocessing', exec_id=exec_id, login=self.__credentials[0],
                                      password=self.__credentials[1], url=self.base_url, group_token=self.__token, group=self.group)
@@ -415,7 +422,7 @@ class NeomarilPreprocessingClient(BaseNeomarilClient):
 
         super().__init__(login=self.__credentials[0], password=self.__credentials[1], url=url)
         
-    def __get_preprocessing_status(self, preprocessing_id:str, group:str) -> dict:
+    def __get_preprocessing_status(self, **kwargs) -> dict:
         """
         Gets the status of the pre processing with the hash equal to `preprocessing_id`
 
@@ -436,6 +443,7 @@ class NeomarilPreprocessingClient(BaseNeomarilClient):
         dict
             The pre processing status and a message if the status is 'Failed'
         """
+        preprocessing_id, group = check_args(kwargs, ["preprocessing_id", "group"], {})
 
         url = f"{self.base_url}/preprocessing/status/{group}/{preprocessing_id}"
         response = requests.get(url, headers={'Authorization': 'Bearer ' + refresh_token(*self.__credentials, self.base_url)})
@@ -444,7 +452,7 @@ class NeomarilPreprocessingClient(BaseNeomarilClient):
         
         return response.json()
 
-    def get_preprocessing(self, preprocessing_id:str, group:str="datarisk", group_token:Optional[str]=None, wait_for_ready:bool=True) -> NeomarilPreprocessing:
+    def get_preprocessing(self, **kwargs) -> NeomarilPreprocessing:
         """
         Access a pre processing using its id
 
@@ -474,7 +482,9 @@ class NeomarilPreprocessingClient(BaseNeomarilClient):
         Example
         -------
         >>> preprocessing.get_preprocessing(preprocessing_id='M9c3af308c754ee7b96b2f4a273984414d40a33be90242908f9fc4aa28ba8ec4', group='ex_group')
-        """        
+        """
+        preprocessing_id, group, group_token, wait_for_ready = check_args(kwargs, ["preprocessing_id"], {"group": "datarisk", "group_token": None, "wait_for_ready": True})
+
         try:
             response = self.__get_preprocessing_status(preprocessing_id, group)
         except KeyError:
@@ -507,8 +517,7 @@ class NeomarilPreprocessingClient(BaseNeomarilClient):
         else:
             raise ServerError('Unknown preprocessing status: ',status)
         
-    def search_preprocessing(self, name:Optional[str]=None, state:Optional[str]=None, 
-                             group:Optional[str]=None, only_deployed:bool=False) -> list:
+    def search_preprocessing(self, **kwargs) -> list:
         """
         Search for pre processing using the name of the pre processing
 
@@ -536,6 +545,8 @@ class NeomarilPreprocessingClient(BaseNeomarilClient):
         -------
         >>> client.search_preprocessing(group='ex_group', only_deployed=True)
         """
+        name, state, group, only_deployed = check_args(kwargs, [], {"name": None, "state": None, "group": None, "only_deployed": False})
+
         url = f"{self.base_url}/preprocessing/search"
 
         query = {}
@@ -562,9 +573,9 @@ class NeomarilPreprocessingClient(BaseNeomarilClient):
         else:
             raise ServerError('Unexpected server error: ', response.text)
 
-    def get_logs(self, preprocessing_id, start:Optional[str]=None, end:Optional[str]=None, routine:Optional[str]=None, type:Optional[str]=None):
+    def get_logs(self, **kwargs):
         """
-        Get the logs 
+        Get the logs
 
         Parameters
         ----------
@@ -600,6 +611,8 @@ class NeomarilPreprocessingClient(BaseNeomarilClient):
                 'Routine': 'Run'}]
          }
         """
+        preprocessing_id, start, end, routine, type = check_args(kwargs, ["preprocessing_id"], {"start": None, "end": None, "routine": None, "type": None})
+
         url = f"{self.base_url}/preprocessing/logs/{preprocessing_id}"
         return self._logs(url, self.__credentials, start=start, end=end, routine=routine, type=type)
 
@@ -607,6 +620,7 @@ class NeomarilPreprocessingClient(BaseNeomarilClient):
                             requirements_file:str, schema:Optional[Union[str, dict]]=None, 
                             group:Optional[str]=None, extra_files:Optional[list]=None, env:Optional[str]=None, 
                             python_version:str='3.8', operation:str='Sync', input_type:str=None) -> str:
+        
         """
         Upload the files to the server
 
@@ -645,6 +659,7 @@ class NeomarilPreprocessingClient(BaseNeomarilClient):
         str
             The new pre processing id (hash)
         """
+        preprocessing_name, preprocessing_reference, source_file, requirements_file, schema, group, extra_files, env, python_version, operation, input_type = check_args(kwargs, ["preprocessing_name", "preprocessing_reference", "source_file", "requirements_file"], {"schema": None, "group": None, "extra_files": None, "env": None, "python_version": "3.8", "operation": "Sync", "input_type": None})
         
         url = f"{self.base_url}/preprocessing/register/{group}"
         
@@ -711,6 +726,7 @@ class NeomarilPreprocessingClient(BaseNeomarilClient):
         InputError
             Some input parameters its invalid
         """
+        operation, preprocessing_id, group = check_args(kwargs, ["operation", "preprocessing_id"], {"group": "datarisk"})
         
         url = f"{self.base_url}/preprocessing/{operation}/host/{group}/{preprocessing_id}"
         if operation == 'sync':
@@ -723,11 +739,7 @@ class NeomarilPreprocessingClient(BaseNeomarilClient):
             logger.error(response.text)
             raise InputError('Invalid parameters for preprocessing creation')
 
-    def create(self, preprocessing_name:str, preprocessing_reference:str, source_file:str, 
-                                     requirements_file:str, schema:Optional[Union[str, dict]]=None, 
-                                     group:str=None, extra_files:Optional[list]=None, env:Optional[str]=None,
-                                     python_version:str='3.8', operation='Sync', input_type:str='json|csv|parquet', 
-                                     wait_for_ready:bool=True)-> Union[NeomarilPreprocessing, str]:
+    def create(self, **kwargs)-> Union[NeomarilPreprocessing, str]:
         """
         Deploy a new preprocessing to Neomaril.
 
@@ -772,6 +784,7 @@ class NeomarilPreprocessingClient(BaseNeomarilClient):
         -------
         >>> preprocessing = client.create('Pre processing Example Sync', 'score',  './samples/syncPreprocessing/app.py', './samples/syncPreprocessing/'preprocessing.pkl', './samples/syncPreprocessing/requirements.txt','./samples/syncPreprocessing/schema.json', group=group, operation="Sync")
         """
+        preprocessing_name, preprocessing_reference, source_file, requirements_file, schema, group, extra_files, env, python_version, operation, input_type, wait_for_ready = check_args(kwargs, ["preprocessing_name", "preprocessing_reference", "source_file", "requirements_file"], {"schema": None, "group": None, "extra_files": None, "env": None, "python_version": "3.8", "operation": "Sync", "input_type": "json|csv|parquet", "wait_for_ready": True})
         
         if python_version not in ['3.7', '3.8', '3.9', '3.10']:
             raise InputError('Invalid python version. Avaliable versions are 3.7, 3.8, 3.9, 3.10')
@@ -798,7 +811,7 @@ class NeomarilPreprocessingClient(BaseNeomarilClient):
         
         return self.get_preprocessing(preprocessing_id, group, wait_for_ready=wait_for_ready)
 
-    def get_execution(self, preprocessing_id:str, exec_id:str, group:Optional[str]=None) -> NeomarilExecution:
+    def get_execution(self, **kwargs) -> NeomarilExecution:
         """
         Get a execution instace (Async pre processing only).
 
@@ -820,4 +833,6 @@ class NeomarilPreprocessingClient(BaseNeomarilClient):
         -------
         >>> preprocessing.get_execution( preprocessing_id='M9c3af308c754ee7b96b2f4a273984414d40a33be90242908f9fc4aa28ba8ec4', exec_id = '1')
         """
+        preprocessing_id, exec_id, group = check_args(kwargs, ["preprocessing_id", "exec_id"], {"group": None})
+
         return self.get_preprocessing(preprocessing_id=preprocessing_id, group=group).get_preprocessing_execution(exec_id)

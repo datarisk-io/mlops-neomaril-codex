@@ -75,16 +75,18 @@ class NeomarilTrainingLogger:
                 os.mkdir(f'./{dir_name}')
             self.save_path = f'./{dir_name}'
 
-    def save_model(self, model):
+    def save_model(self, **kwargs):
         """
         Save the trained model to the logger.
 
         Args:
             model: The trained model.
         """
+        model = check_args(kwargs, ["model"], {})
+
         self.model = model
 
-    def save_metric(self, name, value):
+    def save_metric(self, **kwargs):
         """
         Save a metric to the logger.
 
@@ -92,36 +94,44 @@ class NeomarilTrainingLogger:
             name: The name of the metric.
             value: The value of the metric.
         """
+        name, value = check_args(kwargs, ["name", "value"], {})
+
         self.metrics[name] = value 
 
-    def save_model_output(self, model_output):
+    def save_model_output(self, **kwargs):
         """
         Save the model output to the logger.
 
         Args:
             model_output: The output of the trained model.
         """
+        model_output = check_args(kwargs, ["model_output"], {})
+
         self.model_outputs = model_output
 
-    def set_python_version(self, version : str):
+    def set_python_version(self, **kwargs):
         """
         Set the Python version used to train the model.
 
         Args:
             version: The Python version.
         """
+        version = check_args(kwargs, ["version"], {})
+
         self.python_version = version
     
-    def set_requirements(self, requirements : str):
+    def set_requirements(self, **kwargs):
         """
         Set the project requirements.
 
         Args:
             requirements: The path of project requirements.
         """
+        requirements = check_args(kwargs, ["requirements"], {})
+
         self.requirements = requirements
 
-    def save_plot(self, plot : object, filename : str):
+    def save_plot(self, **kwargs):
         """
         Save plot graphic image to the logger.
 
@@ -129,6 +139,8 @@ class NeomarilTrainingLogger:
             plot: A Matplotlib/Plotly/Seaborn graphic object.
             filename: A name to save the plot.
         """
+        plot, filename = check_args(kwargs, ["plot", "filename"], {})
+
         filepath = f'./{filename}.png'
 
         with try_import() as plotly_import:
@@ -151,26 +163,38 @@ class NeomarilTrainingLogger:
 
         raise ValueError("The plot only accepts plots of Matplotlib/Plotly/Seaborn")
 
-    def save_plotly_plot(self, plot, filepath):
+    def save_plotly_plot(self, **kwargs):
+
+        #TODO: missing docs
+
+        plot, filename = check_args(kwargs, ["plot", "filename"], {})
+
         image_data = plot.to_image()
         with open(filepath, 'wb') as f:
             f.write(image_data)
         self.add_extra(extra=filepath)
             
-    def save_seaborn_or_matplotlib_plot(self, plot, filepath):
+    def save_seaborn_or_matplotlib_plot(self, **kwargs):
+
+        #TODO: missing docs
+        
+        plot, filename = check_args(kwargs, ["plot", "filename"], {})
+
         plot.savefig(filepath)
         self.add_extra(extra=filepath)
 
-    def set_extra(self, extra : list):
+    def set_extra(self, **kwargs):
         """
         Set the extra files list.
 
         Args:
             extra: A list of paths of the extra file.
         """
+        extras = check_args(kwargs, ["extras"], {})
+
         self.extras = extra
 
-    def add_extra(self, extra : Union[pd.DataFrame, str], filename : str = None):
+    def add_extra(self, **kwargs):
         """
         Add an extra file in the extra file list.
 
@@ -178,6 +202,8 @@ class NeomarilTrainingLogger:
             extra: A path of an extra file or a list to include in extra file list.
             filename: A filename if the extra it's a DataFrame.
         """
+        extra, filename = check_args(kwargs, ["extra"], {"filename": None})
+
         if isinstance(extra, str):
             if os.path.exists(extra):
                 self.extras.append(extra)
@@ -189,16 +215,18 @@ class NeomarilTrainingLogger:
             else:
                 raise InputError('Needs a filename to save the dataframe parquet.')
 
-    def add_requirements(self, filename:str):
+    def add_requirements(self, **kwargs):
         """
         Add requirements file.
 
         Args:
             filename: The name of output filename to save.
         """
+        filename = check_args(kwargs, ["filename"], {})
+
         self.requirements = filename
 
-    def __to_parquet(self, output_filename : str, input_data : pd.DataFrame):
+    def __to_parquet(self, **kwargs):
         """
         Transform dataframe to parquet.
 
@@ -206,11 +234,13 @@ class NeomarilTrainingLogger:
             output_filename: The name of output filename to save.
             input_data: A pandas dataframe to save.
         """
+        output_filename, input_data = check_args(kwargs, ["output_filename", "input_data" ], {})
+
         path = os.path.join(self.save_path, f'{output_filename}.parquet')
         input_data.to_parquet(path)
         return path
 
-    def __to_json(self, output_filename : str, input_data : dict):
+    def __to_json(self, **kwargs):
         """
         Transform dict to json.
 
@@ -218,12 +248,14 @@ class NeomarilTrainingLogger:
             output_filename: The name of output filename to save.
             input_data: A dictionary to save.
         """
+        output_filename, input_data = check_args(kwargs, ["output_filename", "input_data" ], {})
+
         path = os.path.join(self.save_path, f'{output_filename}.json')
         with open(path, "w", encoding='utf-8') as f:
             json.dump(input_data, f)
         return path
     
-    def __to_pickle(self, output_filename : str, input_data):
+    def __to_pickle(self, **kwargs):
         """
         Transform content to pickle.
 
@@ -231,6 +263,8 @@ class NeomarilTrainingLogger:
             output_filename: The name of output filename to save.
             input_data: The content to save.
         """
+        output_filename, input_data = check_args(kwargs, ["output_filename", "input_data" ], {})
+
         path = os.path.join(self.save_path, f'{output_filename}.pkl')
         with open(path, "wb") as f:
             cloudpickle.dump(input_data, f)
@@ -293,10 +327,12 @@ class NeomarilTrainingLogger:
 
         self.params = {**params, **self.params}
 
-    def _parse_data_objects(self, obj:Any) -> pd.DataFrame:
+    def _parse_data_objects(self, **kwargs) -> pd.DataFrame:
         """
         Tranform data types to dataframe
         """
+
+        obj = check_args(kwargs, ["obj"], {})
 
         if isinstance(obj, pd.Series):
             return obj.to_frame()
@@ -659,8 +695,10 @@ class NeomarilTrainingExperiment(BaseNeomaril):
         print(run.download_result())
     """
 
-    def __init__(self, training_id:str, login:Optional[str]=None, password:Optional[str]=None, 
-                 group:str="datarisk", url:str='https://neomaril.staging.datarisk.net/') -> None:
+    def __init__(self, **kwargs) -> None:
+
+        training_id, login, password, group, url = check_args(kwargs, ["training_id"], {"login": None, "password": None, "group": "datarisk", "url": "https://neomaril.staging.datarisk.net/"})
+        
         super().__init__(url)
         load_dotenv()
         logger.info('Loading .env')
@@ -697,15 +735,7 @@ class NeomarilTrainingExperiment(BaseNeomaril):
     def __str__(self):
         return f'NEOMARIL training experiment "{self.experiment_name} (Group: {self.group}, Id: {self.training_id})"'
     
-    def __upload_training(self, run_name:str, training_type:str='External', description:Optional[str]=None, 
-                          train_data:Optional[str]=None, training_reference:Optional[str]=None, 
-                          python_version:str='3.8', conf_dict:Optional[Union[str, dict]]=None,
-                          source_file:Optional[str]=None, requirements_file:Optional[str]=None,
-                          env:Optional[str]=None, X_train=None, y_train=None, model_outputs=None,
-                          model_file:Optional[str]=None, model_metrics:Optional[Union[str, dict]]=None,
-                          model_params:Optional[Union[str, dict]]=None,  model_hash:Optional[str]=None,
-                          extra_files:Optional[list]=None) -> str:
-        
+    def __upload_training(self, **kwargs) -> str:
         """
         Upload the files to the server
 
@@ -756,6 +786,7 @@ class NeomarilTrainingExperiment(BaseNeomaril):
         str
             The new model id (hash)
         """
+        run_name, training_type, description, train_data, training_reference, python_version, conf_dict, source_file, requirements_file, env, model_file, model_metrics, model_params, model_hash, extra_files = check_args(kwargs, ["run_name"], {"training_type": "External", "description": None, "train_data": None, "training_reference": None, "python_version": "3.8", "conf_dict": None, "source_file": None, "requirements_file": None, "env": None, "model_file": None, "model_metrics": None, "model_params": None, "model_hash": None, "extra_files": None})
         
         url = f"{self.base_url}/training/upload/{self.group}/{self.training_id}"
 
@@ -867,7 +898,7 @@ class NeomarilTrainingExperiment(BaseNeomaril):
             logger.error(message)
             raise InputError('Bad input for training upload')
 
-    def __execute_training(self, exec_id:str) -> None:
+    def __execute_training(self, **kwargs) -> None:
         """
         Builds the model execution environment
 
@@ -881,6 +912,7 @@ class NeomarilTrainingExperiment(BaseNeomaril):
         InputError
             Some input parameters its invalid
         """
+        exec_id = check_args(kwargs, [], {"exec_id": True})
         
         url = f"{self.base_url}/training/execute/{self.group}/{self.training_id}/{exec_id}"
         response = requests.get(url, headers={'Authorization': 'Bearer ' + refresh_token(*self.__credentials, self.base_url)})
@@ -903,15 +935,7 @@ class NeomarilTrainingExperiment(BaseNeomaril):
         self.training_data = response.json()['Description']
         self.executions = [c['Id'] for c in self.training_data['Executions']]
 
-    def run_training(self, run_name:str, training_type:str='External', description:Optional[str]=None, 
-                     train_data:Optional[str]=None, training_reference:Optional[str]=None, 
-                     python_version:str='3.8', conf_dict:Optional[Union[str, dict]]=None, 
-                     source_file:Optional[str]=None, requirements_file:Optional[str]=None,
-                     extra_files:Optional[list]=None, env:Optional[str]=None, 
-                     X_train=None, y_train=None, model_outputs=None,
-                     model_file:Optional[str]=None, model_metrics:Optional[Union[str, dict]]=None,
-                     model_params:Optional[Union[str, dict]]=None, model_hash:Optional[str]=None,
-                     wait_complete:Optional[bool]=False) -> Union[dict, NeomarilExecution]:
+    def run_training(self, **kwargs) -> Union[dict, NeomarilExecution]:
         """
         Runs a prediction from the current model.
 
@@ -956,6 +980,8 @@ class NeomarilTrainingExperiment(BaseNeomaril):
         -------
         >>> execution = run = training.run_training('First test', data_path+'dados.csv', training_reference='train_model', python_version='3.9', requirements_file=data_path+'requirements.txt', wait_complete=True)
         """
+        run_name, training_type, description, train_data, training_reference, python_version, conf_dict, source_file, requirements_file, extra_files, env, X_train, y_train, model_outputs, model_file, model_metrics, model_params, model_hash, wait_complete = check_args(kwargs, ["run_name"], {"training_type": "External", "description": None, "train_data": None, "training_reference": None, "python_version": "3.8", "conf_dict": None, "source_file": None, "requirements_file": None, "extra_files": None, "env": None, "X_train": None, "y_train": None, "model_outputs": None, "model_file": None, "model_metrics": None, "model_params": None, "model_hash": None, "wait_complete": False})
+
         if python_version not in ['3.7', '3.8', '3.9', '3.10']:
             raise InputError('Invalid python version. Avaliable versions are 3.7, 3.8, 3.9, 3.10')
 
@@ -1001,10 +1027,12 @@ class NeomarilTrainingExperiment(BaseNeomaril):
             else:
                 return run
 
-    def __call__(self, data: dict) -> dict:
-            return self.predict(data)
+    def __call__(self, **kwargs) -> dict:
+        data = check_args(kwargs, ["data"], {})
 
-    def get_training_execution(self, exec_id:Optional[str]=None) -> NeomarilTrainingExecution:
+        return self.predict(data)
+
+    def get_training_execution(self, **kwargs) -> NeomarilTrainingExecution:
         """
         Get a execution instace.
 
@@ -1018,6 +1046,8 @@ class NeomarilTrainingExperiment(BaseNeomaril):
         NeomarilExecution
             The choosen execution
         """
+        exec_id = check_args(kwargs, [], {"exec_id": None})
+
         if not exec_id:
             self.__refresh_execution_list()
             logger.info("Execution id not informed. Getting last execution")
@@ -1046,7 +1076,9 @@ class NeomarilTrainingExperiment(BaseNeomaril):
         return [self.get_training_execution(e) for e in self.executions]
     
     @contextmanager
-    def log_train(self, name, X_train, y_train, description:Optional[str]=None, save_path:Optional[str]=None):
+    def log_train(self, **kwargs):
+
+        name, X_train, y_train, description = check_args(kwargs, ["name", "X_train", "y_train"], {"description": None})
         
         try:
 
@@ -1094,7 +1126,7 @@ class NeomarilTrainingClient(BaseNeomarilClient):
         print(client.get_training(training.training_id, 'ex_group').training_data)
 
     """
-    def __init__(self, login:Optional[str]=None, password:Optional[str]=None, url:str='https://neomaril.staging.datarisk.net/') -> None:
+    def __init__(self, **kwargs) -> None:
         """Client for acessing Neomaril and manage models
 
         Args:
@@ -1105,6 +1137,8 @@ class NeomarilTrainingClient(BaseNeomarilClient):
                 AuthenticationError: Unvalid credentials
                 ServerError: Server unavailable
         """
+        login, password, url = check_args(kwargs, [], {"login": None, "password": None, "url": 'https://neomaril.staging.datarisk.net/'})
+
         load_dotenv()
         logger.info('Loading .env')
 
@@ -1121,7 +1155,7 @@ class NeomarilTrainingClient(BaseNeomarilClient):
         return f"NEOMARIL {self.base_url} Training client:{self.client_version}"
         
     
-    def get_training(self, training_id:str, group:str="datarisk") -> NeomarilTrainingExperiment:
+    def get_training(self, **kwargs) -> NeomarilTrainingExperiment:
         """
         Acess a model using its id
 
@@ -1148,12 +1182,13 @@ class NeomarilTrainingClient(BaseNeomarilClient):
         -------
         >>> training = get_training('Tfb3274827a24dc39d5b78603f348aee8d3dbfe791574dc4a6681a7e2a6622fa')
         """
+        training_id, group = check_args(kwargs, ["training_id"], {"group": "datarisk"})
 
         return NeomarilTrainingExperiment(training_id, login=self.__credentials[0], 
                                           password=self.__credentials[1], group=group, url=self.base_url)
     
 
-    def create_training_experiment(self, experiment_name:str, model_type:str, group:str='datarisk')-> NeomarilTrainingExperiment:
+    def create_training_experiment(self, **kwargs) -> NeomarilTrainingExperiment:
         """
         Create a new training experiment on Neomaril.
 
@@ -1181,7 +1216,8 @@ class NeomarilTrainingClient(BaseNeomarilClient):
         Example
         -------
         >>> training = client.create_training_experiment('Training example', 'Classification', 'ex_group')
-        """       
+        """
+        experiment_name, model_type, group = check_args(kwargs, ["experiment_name", "model_type"], {"group": "datarisk"})
         
         if group:
             group = group.lower().strip().replace(" ", "_").replace(".", "_").replace("-", "_")
@@ -1215,4 +1251,4 @@ class NeomarilTrainingClient(BaseNeomarilClient):
 
         
         return NeomarilTrainingExperiment(training_id, login=self.__credentials[0], password=self.__credentials[1], 
-                                          group=group, url=self.base_url)  
+                                          group=group, url=self.base_url)

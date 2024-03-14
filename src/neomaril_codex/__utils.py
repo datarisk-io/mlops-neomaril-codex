@@ -43,3 +43,10 @@ def refresh_token(login:str, password:str, base_url:str):
   else:
     raise AuthenticationError(respose.text)
 
+def check_args(params: dict, required: list, def_vals: dict):
+  try:
+    return [params[p] for p in required] + [params.get(p, def_vals[p]) for p in def_vals.keys()]
+  except KeyError as e:
+    # INFO: https://peps.python.org/pep-0409/
+    raise TypeError(f"missing 1 required argument: '{e.args[0]}'") from None
+

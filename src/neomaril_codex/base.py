@@ -127,7 +127,7 @@ class BaseNeomarilClient(BaseNeomaril):
 		else:
 				raise ServerError('Unexpected server error: ', response.text)
 
-	def create_group(self, name:str, description:str) -> bool:
+	def create_group(self, **kwargs) -> bool:
 		"""
 		Create a group for multiple models of the same final client at the end if it returns TRUE, a message with the token for that group will be returned as a INFO message.
 		You should keep this token information to be able to run the model of that group afterwards.
@@ -149,6 +149,9 @@ class BaseNeomarilClient(BaseNeomaril):
 		bool
 			Returns True if the group was successfully created and False if not
 		"""
+
+		name, description = check_args(kwargs, ["name", "description"], {})
+
 		data = {"name": name, "description": description}
 
 		url = f"{self.base_url}/groups"
@@ -165,7 +168,7 @@ class BaseNeomarilClient(BaseNeomaril):
 		else:
 			raise ServerError('Unexpected server error: ', response.text)
 
-	def refresh_group_token(self, name:str, force:bool=False) -> bool:
+	def refresh_group_token(self, **kwargs) -> bool:
 		"""
 		Refresh the group token. If the the token its still valid it wont be changed, unless you use parameter force = True.
 		At the end a message with the token for that group will be returned as a INFO message.
@@ -202,7 +205,8 @@ class BaseNeomarilClient(BaseNeomaril):
 
 				return isCreated
 		"""
-
+		name, force = check_args(kwargs, ["name"], {"force": False})
+a
 		url = f"{self.base_url}/refresh/{name}"
 		token = refresh_token(*self.__credentials, self.base_url)
 		
@@ -368,7 +372,7 @@ class NeomarilExecution(BaseNeomaril):
 				sleep(30)
 				self.status = self.get_status()['Status']
 
-	def download_result(self, path:Optional[str]='./', filename:Optional[str]='output.zip') -> dict:
+	def download_result(self, **kwargs) -> dict:
 		"""
 		Gets the output of the execution.
 
@@ -389,6 +393,9 @@ class NeomarilExecution(BaseNeomaril):
 		dict
 			Returns the path for the result file.
 		"""
+
+		path, filename = check_args(kwargs, [], {"path": "./", filename: "output.zip"})
+		
 		if self.status in ['Running', 'Requested']:
 			self.status = self.get_status()['Status']
 		
