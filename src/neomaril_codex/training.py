@@ -549,8 +549,6 @@ class NeomarilTrainingExecution(NeomarilExecution):
         """
         
         url = f"{self.base_url}/model/{operation}/host/{self.group}/{model_id}"
-        if operation == 'sync':
-            url = url.replace('7070','7071')
         response = requests.get(url, headers={'Authorization': 'Bearer ' + refresh_token(*self.credentials, self.base_url)})
         if response.status_code == 202:
             logger.info(f"Model host in process - Hash: {model_id}")
