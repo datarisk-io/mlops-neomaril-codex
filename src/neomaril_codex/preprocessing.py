@@ -53,7 +53,7 @@ class NeomarilPreprocessing(BaseNeomaril):
         self.group = group
         self.__token = group_token if group_token else os.getenv('NEOMARIL_GROUP_TOKEN')
         
-        url = f"{self.base_url}/preprocessing/list"
+        url = f"{self.base_url}/preprocessing/search"
         response = requests.get(url, headers={'Authorization': 'Bearer ' + refresh_token(*self.credentials, self.base_url)})
 
         results = response.json()
