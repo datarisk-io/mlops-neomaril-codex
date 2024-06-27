@@ -659,7 +659,7 @@ class NeomarilModel(BaseNeomaril):
             conf = json.dumps(configuration_file)
 
         upload_data = [
-            ("configuration", ('conf.json', conf)),
+            ("configuration", ('configuration.json', conf)),
         ]
 
         form_data = {'preprocess_reference': preprocess_reference, 'shap_reference': shap_reference}

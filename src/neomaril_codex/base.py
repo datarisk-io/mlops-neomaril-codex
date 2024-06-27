@@ -202,7 +202,7 @@ class BaseNeomarilClient(BaseNeomaril):
                 return isCreated
         """
 
-        url = f"{self.base_url}/refresh/{name}"
+        url = f"{self.base_url}/groups/refresh/{name}"
         token = refresh_token(*self.credentials, self.base_url)
         
         response = requests.get(url, params={'force': str(force).lower()},
