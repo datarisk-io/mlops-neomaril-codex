@@ -619,7 +619,7 @@ class NeomarilModel(BaseNeomaril):
             raise InputError('Monitoring host error')
 
     def register_monitoring(self, *, preprocess_reference:str, shap_reference:str, configuration_file:Union[str, dict], preprocess_file:Optional[str]=None,
-                            requirements_file:Optional[str]=None) -> str:
+                            requirements_file:Optional[str]=None, extra_files:Optional[list]=None) -> str:
         """
         Register the model monitoring configuration at the database
 
@@ -635,7 +635,8 @@ class NeomarilModel(BaseNeomaril):
             Path of the preprocess script
         requirements_file : str
             Path of the requirements file
-
+        extra_files : list, optional
+            A optional list with additional files paths that should be uploaded. If the scoring function refer to this file they will be on the same folder as the source file
 
         Raises
         ------
@@ -676,6 +677,10 @@ class NeomarilModel(BaseNeomaril):
             
         if requirements_file:
             upload_data.append(("requirements", ('requirements.txt', open(requirements_file, 'rb'))))
+
+        if extra_files:
+            extra_data = [('extra', (c.split('/')[-1], open(c, 'rb'))) for c in extra_files]
+            upload_data += extra_data
 
         response = requests.post(url, data=form_data, files=upload_data, 
                                  headers={'Authorization': 'Bearer ' + refresh_token(*self.credentials, self.base_url)})
