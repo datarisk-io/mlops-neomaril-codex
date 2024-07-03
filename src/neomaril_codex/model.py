@@ -345,7 +345,7 @@ class NeomarilModel(BaseNeomaril):
                                 logger.info("Returning Preprocessing run instead.")
                                 return pre_run
                             data = './result_preprocessing'
-                            pre_run.download_result(path='./', filename='result_preprocessing')
+                            pre_run.download_result(path='./', filename='result_preprocessing', wait_complete=wait_complete)
                         else:
                             raise PreprocessingError("Can only use async preprocessing with async models")
 
