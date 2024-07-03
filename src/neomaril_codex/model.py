@@ -338,14 +338,14 @@ class NeomarilModel(BaseNeomaril):
                     if preprocessing:
                         if preprocessing.operation == 'async':
                             preprocessing.set_token(group_token)
-                            pre_run = preprocessing.run(data=data)
+                            pre_run = preprocessing.run(data=data, wait_complete=wait_complete)
                             pre_run.wait_ready()
                             if pre_run.status != "Succeeded":
                                 logger.error("Preprocessing failed, we wont send any data to it")
                                 logger.info("Returning Preprocessing run instead.")
                                 return pre_run
                             data = './result_preprocessing'
-                            pre_run.download_result(path='./', filename='result_preprocessing', wait_complete=wait_complete)
+                            pre_run.download_result(path='./', filename='result_preprocessing')
                         else:
                             raise PreprocessingError("Can only use async preprocessing with async models")
 
