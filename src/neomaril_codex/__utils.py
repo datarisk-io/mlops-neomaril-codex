@@ -2,9 +2,10 @@ import io
 import json
 
 import requests
+import yaml
 from cachetools.func import ttl_cache
 
-from neomaril_codex.exceptions import *
+from neomaril_codex.exceptions import AuthenticationError, ServerError
 
 
 def parse_dict_or_file(obj):
@@ -70,3 +71,15 @@ def refresh_token(login: str, password: str, base_url: str):
         return respose.json()["Token"]
     else:
         raise AuthenticationError(respose.text)
+
+
+def parse_json_to_yaml(json_dict) -> str:
+    """Parse a json file to yaml format
+
+    Args:
+        json_dict (dict): data in a json format
+
+    Returns:
+        str: data in the yaml format
+    """
+    return yaml.dump(json_dict, allow_unicode=True, default_flow_style=False)

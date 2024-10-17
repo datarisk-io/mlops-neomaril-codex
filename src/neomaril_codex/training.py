@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+import json
 import os
 import re
 import sys
 from contextlib import contextmanager
+from http import HTTPStatus
 from time import sleep
 from typing import Any, List, Optional, Union
 
@@ -14,13 +16,23 @@ import pandas as pd
 import requests
 from lazy_imports import try_import
 
-from neomaril_codex.__utils import *
-from neomaril_codex.base import *
+from neomaril_codex.__utils import parse_dict_or_file, parse_json_to_yaml, refresh_token
+from neomaril_codex.base import BaseNeomaril, BaseNeomarilClient, NeomarilExecution
 from neomaril_codex.datasources import NeomarilDataset
-from neomaril_codex.exceptions import *
+from neomaril_codex.exceptions import (
+    AuthenticationError,
+    ExecutionError,
+    GroupError,
+    InputError,
+    ModelError,
+    ServerError,
+    TrainingError,
+)
+from neomaril_codex.logger_config import get_logger
 from neomaril_codex.model import NeomarilModel
 
 patt = re.compile(r"(\d+)")
+logger = get_logger()
 
 
 class NeomarilTrainingLogger:
@@ -268,7 +280,7 @@ class NeomarilTrainingLogger:
 
         try:
             params["pipeline_steps"] = list(self.model.named_steps.keys())
-        except:
+        except Exception:
             params["pipeline_steps"] = [
                 str(self.model.__class__).replace("<class '", "").replace("'>", "")
             ]
@@ -538,7 +550,8 @@ class NeomarilTrainingExecution(NeomarilExecution):
             logger.info(f'{data["Message"]} - Hash: "{model_id}"')
             return model_id
         else:
-            logger.error(f"Upload error: {response.text}")
+            formatted_msg = parse_json_to_yaml(response.json())
+            logger.error(f"Upload error:\n{formatted_msg}")
             raise InputError("Invalid parameters for model creation")
 
     def get_status(self) -> dict:
@@ -566,7 +579,8 @@ class NeomarilTrainingExecution(NeomarilExecution):
             },
         )
         if response.status_code not in [200, 410]:
-            logger.error(response.text)
+            formatted_msg = parse_json_to_yaml(response.json())
+            logger.error(f"Something went wrong...\n{formatted_msg}")
             raise ExecutionError(f'Execution "{self.exec_id}" unavailable')
 
         result = response.json()
@@ -586,7 +600,7 @@ class NeomarilTrainingExecution(NeomarilExecution):
             self.run_data = self.execution_data["RunData"]
             try:
                 del self.run_data["tags"]
-            except:
+            except Exception:
                 pass
         return result
 
@@ -617,15 +631,19 @@ class NeomarilTrainingExecution(NeomarilExecution):
         )
         if response.status_code == 202:
             logger.info(f"Model host in process - Hash: {model_id}")
-        elif response.status_code == 401:
-            logger.error(response.text)
-            raise AuthenticationError("Login not authorized")
-        elif response.status_code >= 500:
-            logger.error(response.text)
-            raise ServerError("Server Error")
-        else:
-            logger.error(response.text)
-            raise InputError("Invalid parameters for model creation")
+
+        formatted_msg = parse_json_to_yaml(response.json())
+
+        if response.status_code == 401:
+            logger.error("Login or password are invalid, please check your credentials.")
+            raise AuthenticationError("Login not authorized.")
+
+        if response.status_code >= 500:
+            logger.error("Server is not available. Please, try it later.")
+            raise ServerError("Server is not available!")
+
+        logger.error(f"Something went wrong...\n{formatted_msg}")
+        raise InputError("Invalid parameters for model creation")
 
     def promote_model(
         self,
@@ -806,12 +824,20 @@ class NeomarilTrainingExperiment(BaseNeomaril):
 
         if response.status_code == 404:
             raise ModelError(f'Experiment "{training_id}" not found.')
-        elif response.status_code == 401:
-            logger.error(response.text)
-            raise AuthenticationError("Login not authorized")
-        elif response.status_code >= 500:
-            logger.error(response.text)
+
+        formatted_msg = parse_json_to_yaml(response.json())
+
+        if response.status_code == 401:
+            logger.error("Login or password are invalid, please check your credentials.")
+            raise AuthenticationError("Login not authorized.")
+
+        if response.status_code >= 500:
+            logger.error("Server is not available. Please, try it later.")
             raise ServerError(f'Unable to retrive experiment "{training_id}"')
+        
+        if response.status_code != 200:
+            logger.error(f"Something went wrong...\n{formatted_msg}")
+            raise Exception("Unexpected error.")
 
         self.training_data = response.json()["Description"]
         self.model_type = self.training_data["ModelType"]
@@ -1008,20 +1034,23 @@ class NeomarilTrainingExperiment(BaseNeomaril):
             headers={"Authorization": "Bearer " + token},
         )
 
-        message = response.text
+        message = parse_json_to_yaml(response.json())
+        raw_response = response.text
 
         if response.status_code == 201:
-            logger.info(message)
-            return re.search(patt, message).group(1)
-        elif response.status_code == 401:
-            logger.error(response.text)
-            raise AuthenticationError("Login not authorized")
-        elif response.status_code >= 500:
-            logger.error(response.text)
-            raise ServerError("Server Error")
-        else:
-            logger.error(message)
-            raise InputError("Bad input for training upload")
+            logger.info(f"Result\n{message}")
+            return re.search(patt, raw_response).group(1)
+
+        if response.status_code == 401:
+            logger.error("Login or password are invalid, please check your credentials.")
+            raise AuthenticationError("Login not authorized.")
+
+        if response.status_code >= 500:
+            logger.error("Server is not available. Please, try it later.")
+            raise ServerError("Server is not available!")
+
+        logger.error(f"Something went wrong...\n{message}")
+        raise InputError("Bad input for training upload")
 
     def __execute_training(self, exec_id: str) -> None:
         """
@@ -1048,15 +1077,20 @@ class NeomarilTrainingExperiment(BaseNeomaril):
         )
         if response.status_code == 200:
             logger.info(f"Model training starting - Hash: {self.training_id}")
-        elif response.status_code == 401:
-            logger.error(response.text)
-            raise AuthenticationError("Login not authorized")
-        elif response.status_code >= 500:
-            logger.error(response.text)
-            raise ServerError("Server Error")
-        else:
-            logger.error(response.text)
-            raise InputError("Invalid parameters for training execution")
+            return HTTPStatus.OK
+
+        formatted_msg = parse_json_to_yaml(response.json())
+
+        if response.status_code == 401:
+            logger.error("Login or password are invalid, please check your credentials.")
+            raise AuthenticationError("Login not authorized.")
+
+        if response.status_code >= 500:
+            logger.error("Server is not available. Please, try it later.")
+            raise ServerError("Server is not available!")
+
+        logger.error(f"Something went wrong...\n{formatted_msg}")
+        raise InputError("Invalid parameters for training execution")
 
     def __refresh_execution_list(self):
         url = f"{self.base_url}/training/describe/{self.group}/{self.training_id}"
@@ -1070,12 +1104,21 @@ class NeomarilTrainingExperiment(BaseNeomaril):
 
         if response.status_code == 404:
             raise ModelError(f'Experiment "{self.training_id}" not found.')
-        elif response.status_code == 401:
-            logger.error(response.text)
-            raise AuthenticationError("Login not authorized")
-        elif response.status_code >= 500:
-            logger.error(response.text)
+
+        formatted_msg = parse_json_to_yaml(response.json())
+
+        if response.status_code == 401:
+            logger.error("Login or password are invalid, please check your credentials.")
+            raise AuthenticationError("Login not authorized.")
+
+        if response.status_code >= 500:
+            logger.error("Server is not available. Please, try it later.")
             raise ServerError(f'Unable to retrive experiment "{self.training_id}"')
+        
+        if response.status_code != 200:
+            logger.error(f"Something went wrong...\n{formatted_msg}")
+            raise Exception("Unexpected error.")
+
 
         self.training_data = response.json()["Description"]
         self.executions = [c["Id"] for c in self.training_data["Executions"]]
@@ -1290,7 +1333,7 @@ class NeomarilTrainingExperiment(BaseNeomaril):
             exec_id = max(self.executions)
         try:
             int(exec_id)
-        except:
+        except Exception:
             InputError(
                 "Unvalid execution Id informed or this training dont have a successful execution yet."
             )
@@ -1434,12 +1477,14 @@ class NeomarilTrainingClient(BaseNeomarilClient):
             url=self.base_url,
         )
 
-    def __get_repeated_thash(self, model_type: str, experiment_name: str, group: str) -> str | None:
+    def __get_repeated_thash(
+        self, model_type: str, experiment_name: str, group: str
+    ) -> str | None:
         """Look for a previous train experiment.
 
         Args:
             experiment_name (str): name given to the training, should be not null, case-sensitive, have between 3 and 32 characters,
-                                   that could be alphanumeric including accentuation (for example: 'é', à', 'ç','ñ') and space, 
+                                   that could be alphanumeric including accentuation (for example: 'é', à', 'ç','ñ') and space,
                                    without blank spaces and special characters
 
             model_type (str): type of the model being trained. It can be
@@ -1467,40 +1512,42 @@ class NeomarilTrainingClient(BaseNeomarilClient):
             },
         )
 
+        formatted_msg = parse_json_to_yaml(response.json())
+
         if response.status_code == 400:
-            logger.error(response.text)
+            logger.error(f"Result\n{formatted_msg}")
             raise InputError("Bad Input")
 
         if response.status_code == 401:
-            logger.error(response.text)
-            raise AuthenticationError("Login not authorized")
+            logger.error("Login or password are invalid, please check your credentials.")
+            raise AuthenticationError("Login not authorized.")
 
         if response.status_code >= 500:
-            logger.error(response.text)
-            raise ServerError("Server Error")
+            logger.error("Server is not available. Please, try it later.")
+            raise ServerError("Server is not available!")
 
         if response.status_code != 200:
-            logger.error(response.text)
+            logger.error(f"Something went wrong...\n{formatted_msg}")
             raise Exception("Unexpected error!")
 
         results = response.json().get("Results")
         for result in results:
             condition = (
-                    result["ExperimentName"] == experiment_name
-                    and result["GroupName"] == group
-                    and result["ModelType"] == model_type
+                result["ExperimentName"] == experiment_name
+                and result["GroupName"] == group
+                and result["ModelType"] == model_type
             )
             if condition:
                 logger.info("Found experiment with same attributes...")
                 return result["TrainingHash"]
 
     def __create(self, experiment_name: str, model_type: str, group: str) -> str:
-        """Creates a train experiment. A train experiment can aggregate multiple training runs (also called executions). 
+        """Creates a train experiment. A train experiment can aggregate multiple training runs (also called executions).
         Each execution can eventually become a deployed model or not.
 
         Args:
             experiment_name (str): name given to the training, should be not null, case-sensitive, have between 3 and 32 characters,
-                                   that could be alphanumeric including accentuation (for example: 'é', à', 'ç','ñ') and space, 
+                                   that could be alphanumeric including accentuation (for example: 'é', à', 'ç','ñ') and space,
                                    without blank spaces and special characters
 
             model_type (str): type of the model being trained. It can be
@@ -1528,24 +1575,26 @@ class NeomarilTrainingClient(BaseNeomarilClient):
             data=data,
             headers={
                 "Authorization": "Bearer "
-                                 + refresh_token(*self.credentials, self.base_url)
+                + refresh_token(*self.credentials, self.base_url)
             },
         )
 
+        formatted_msg = parse_json_to_yaml(response.json())
+
         if response.status_code == 400:
-            logger.error(response.text)
+            logger.error(f"Result\n{formatted_msg}")
             raise InputError("Bad Input")
 
         if response.status_code == 401:
-            logger.error(response.text)
-            raise AuthenticationError("Login not authorized")
+            logger.error("Login or password are invalid, please check your credentials.")
+            raise AuthenticationError("Login not authorized.")
 
         if response.status_code >= 500:
-            logger.error(response.text)
-            raise ServerError("Server Error")
+            logger.error("Server is not available. Please, try it later.")
+            raise ServerError("Server is not available!")
 
         if response.status_code != 201:
-            logger.error(response.text)
+            logger.error(f"Something went wrong...\n{formatted_msg}")
             raise Exception("Unexpected error!")
 
         response_data = response.json()
@@ -1554,7 +1603,12 @@ class NeomarilTrainingClient(BaseNeomarilClient):
         return training_id
 
     def create_training_experiment(
-        self, *, experiment_name: str, model_type: str, group: str = "datarisk", force: bool = False
+        self,
+        *,
+        experiment_name: str,
+        model_type: str,
+        group: str = "datarisk",
+        force: bool = False,
     ) -> NeomarilTrainingExperiment:
         """
         Create a new training experiment on Neomaril.
@@ -1612,14 +1666,21 @@ class NeomarilTrainingClient(BaseNeomarilClient):
             )
 
         logger.info("Trying to load experiment...")
-        training_id = self.__get_repeated_thash(model_type=model_type, experiment_name=experiment_name, group=group)
+        training_id = self.__get_repeated_thash(
+            model_type=model_type, experiment_name=experiment_name, group=group
+        )
 
         if force or training_id is None:
-            msg = ("The experiment you're creating has identical name, group, and model type attributes to an existing one. "
-                   + "Since forced creation is active, we will continue with the process as specified"
-                   if force else "Could not find experiment. Creating a new one...")
+            msg = (
+                "The experiment you're creating has identical name, group, and model type attributes to an existing one. "
+                + "Since forced creation is active, we will continue with the process as specified"
+                if force
+                else "Could not find experiment. Creating a new one..."
+            )
             logger.info(msg)
-            training_id = self.__create(experiment_name=experiment_name, model_type=model_type, group=group) 
+            training_id = self.__create(
+                experiment_name=experiment_name, model_type=model_type, group=group
+            )
 
         return NeomarilTrainingExperiment(
             training_id=training_id,

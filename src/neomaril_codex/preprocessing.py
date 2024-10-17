@@ -1,18 +1,28 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import io
 import json
 import os
 import time
+from http import HTTPStatus
 from time import sleep
 from typing import Optional, Union
 
 import requests
 
-from neomaril_codex.__utils import *
-from neomaril_codex.base import *
-from neomaril_codex.exceptions import *
+from neomaril_codex.__utils import parse_json_to_yaml, refresh_token
+from neomaril_codex.base import BaseNeomaril, BaseNeomarilClient, NeomarilExecution
+from neomaril_codex.exceptions import (
+    AuthenticationError,
+    ExecutionError,
+    GroupError,
+    InputError,
+    PreprocessingError,
+    ServerError,
+)
+from neomaril_codex.logger_config import get_logger
+
+logger = get_logger()
 
 
 class NeomarilPreprocessing(BaseNeomaril):
@@ -73,7 +83,7 @@ class NeomarilPreprocessing(BaseNeomaril):
             },
         )
 
-        result = response.json()['Description']
+        result = response.json()["Description"]
         self.operation = result.get("Operation").lower()
 
         response = self.__get_status()
@@ -260,15 +270,17 @@ class NeomarilPreprocessing(BaseNeomaril):
                                 response = run.get_status()
                                 status = response["Status"]
                         if status == "Failed":
-                            logger.error(response["Message"])
+                            formatted_msg = parse_json_to_yaml(response.json())
+                            logger.error(f"Something went wrong...\n{formatted_msg}")
                             raise ExecutionError("Training execution failed")
                     else:
                         raise ServerError(req.text)
 
             else:
-                raise AuthenticationError("Group token not informed")
-        return run
+                logger.error("Login or password are invalid, please check your credentials.")
+                raise GroupError("Group token not informed.")
 
+        return run
 
     def get_preprocessing_execution(self, exec_id: str) -> NeomarilExecution:
         """
@@ -328,8 +340,10 @@ class NeomarilPreprocessing(BaseNeomaril):
         )
         if response.status_code == 200:
             return response.json()
-        else:
-            raise PreprocessingError(response.text)
+
+        formatted_msg = parse_json_to_yaml(response.json())
+        logger.error(f"Something went wrong...\n{formatted_msg}")
+        raise PreprocessingError("Preprocessing has failed")
 
 
 class NeomarilPreprocessingClient(BaseNeomarilClient):
@@ -482,6 +496,8 @@ class NeomarilPreprocessingClient(BaseNeomarilClient):
         )
 
         if response.status_code not in [200, 410]:
+            formatted_msg = parse_json_to_yaml(response.json())
+            logger.error(f"Something went wrong...\n{formatted_msg}")
             raise PreprocessingError(f'Preprocessing "{preprocessing_id}" not found')
 
         return response.json()
@@ -641,15 +657,19 @@ class NeomarilPreprocessingClient(BaseNeomarilClient):
         if response.status_code == 200:
             results = response.json()["Results"]
             return results
-        elif response.status_code == 401:
-            logger.error(response.text)
-            raise AuthenticationError("Login not authorized")
-        elif response.status_code >= 500:
-            logger.error(response.text)
-            raise ServerError("Server Error")
-        else:
-            logger.error(response.text)
-            raise PreprocessingError("Could not search the preprocessing script")
+
+        formatted_msg = parse_json_to_yaml(response.json())
+
+        if response.status_code == 401:
+            logger.error("Login or password are invalid, please check your credentials.")
+            raise AuthenticationError("Login not authorized.")
+
+        if response.status_code >= 500:
+            logger.error("Server is not available. Please, try it later.")
+            raise ServerError("Server is not available!")
+
+        logger.error(f"Something went wrong...\n{formatted_msg}")
+        raise PreprocessingError("Could not search the preprocessing script")
 
     def get_logs(
         self,
@@ -819,15 +839,19 @@ class NeomarilPreprocessingClient(BaseNeomarilClient):
                 f'{data["Message"]} - Hash: "{preprocessing_id}" with response {response.text}'
             )
             return preprocessing_id
-        elif response.status_code == 401:
-            logger.error(response.text)
-            raise AuthenticationError("Login not authorized")
-        elif response.status_code >= 500:
-            logger.error(response.text)
-            raise ServerError("Server Error")
-        else:
-            logger.error("Upload error: " + response.text)
-            raise InputError("Invalid parameters for preprocessing creation")
+
+        formatted_msg = parse_json_to_yaml(response.json())
+
+        if response.status_code == 401:
+            logger.error("Login or password are invalid, please check your credentials.")
+            raise AuthenticationError("Login not authorized.")
+
+        if response.status_code >= 500:
+            logger.error("Server is not available. Please, try it later.")
+            raise ServerError("Server is not available!")
+
+        logger.error(f"Something went wrong...\n{formatted_msg}")
+        raise InputError("Invalid parameters for preprocessing creation")
 
     def __host_preprocessing(
         self, *, operation: str, preprocessing_id: str, group: str
@@ -864,15 +888,20 @@ class NeomarilPreprocessingClient(BaseNeomarilClient):
 
         if response.status_code == 202:
             logger.info(f"Preprocessing host in process - Hash: {preprocessing_id}")
-        elif response.status_code == 401:
-            logger.error(response.text)
-            raise AuthenticationError("Login not authorized")
-        elif response.status_code >= 500:
-            logger.error(response.text)
-            raise ServerError("Server Error")
-        else:
-            logger.error(response.text)
-            raise InputError("Invalid parameters for preprocessing creation")
+            return HTTPStatus.OK
+
+        formatted_msg = parse_json_to_yaml(response.json())
+
+        if response.status_code == 401:
+            logger.error("Login or password are invalid, please check your credentials.")
+            raise AuthenticationError("Login not authorized.")
+
+        if response.status_code >= 500:
+            logger.error("Server is not available. Please, try it later.")
+            raise ServerError("Server is not available!")
+
+        logger.error(f"Something went wrong...\n{formatted_msg}")
+        raise InputError("Invalid parameters for preprocessing creation")
 
     def create(
         self,
